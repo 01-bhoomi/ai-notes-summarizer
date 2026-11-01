@@ -33,6 +33,7 @@ const Dashboard = () => {
 
   const recognitionRef = useRef(null);
   const activeFieldRef = useRef(null);
+  const processedRef = useRef(0);
 
   const [showTip, setShowTip] = useState(() => {
     return !localStorage.getItem("hasSeenTip");
@@ -83,13 +84,17 @@ const Dashboard = () => {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang = "en-US";
+    recognition.lang = "en-IN";
 
-    recognition.onresult = (event) => {
+      recognition.onresult = (event) => {
       let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript + " ";
+      for (let i = processedRef.current; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          transcript += event.results[i][0].transcript + " ";
+          processedRef.current = i + 1;
+        }
       }
+      if (!transcript) return;
 
       if (activeFieldRef.current === "title") {
         setTitle((prev) => (prev ? prev + " " + transcript : transcript).trim());
@@ -117,10 +122,19 @@ const Dashboard = () => {
     };
 
     recognitionRef.current = recognition;
+    return () => {
+      recognition.onresult = null;
+      recognition.onend = null;
+      recognition.onerror = null;
+      try {
+        recognition.abort();
+      } catch (e) {}
+    };
   }, []);
 
   const startListening = (field) => {
     try {
+      processedRef.current = 0;
       activeFieldRef.current = field;
       setListeningField(field);
       recognitionRef.current.start();
